@@ -54,6 +54,10 @@ async def test_winning_and_losing_boxes(database):
     clock[0] += timedelta(minutes=2)
     winning = await make_selection(factory, settings, clock, 25)
     assert winning.attempt.gift_amount == 10000 and winning.attempt.is_winner
+    async with factory() as session:
+        service = GameService(settings, clock=lambda: clock[0] + timedelta(minutes=2))
+        finished = await service.select_box(session, 1, 2)
+    assert finished.finished
 
 
 @pytest.mark.asyncio
@@ -76,9 +80,9 @@ async def test_claimed_box_is_unavailable_to_other_users(database):
 async def test_statistics(database):
     factory, settings = database
     clock = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
-    await make_selection(factory, settings, clock, 25)
-    clock[0] += timedelta(minutes=2)
     await make_selection(factory, settings, clock, 1)
+    clock[0] += timedelta(minutes=2)
+    await make_selection(factory, settings, clock, 25)
     async with factory() as session:
         user = await session.get(User, 1)
         data = await user_statistics(session, user.id)

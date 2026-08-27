@@ -62,7 +62,9 @@ async def choose_box(callback: CallbackQuery, session_factory, game_service: Gam
         await callback.message.answer("⚠️ Vaqtinchalik xatolik. Keyinroq qayta urinib ko'ring.")
         return
     await callback.message.edit_reply_markup(reply_markup=None)
-    if not result.accepted:
+    if result.finished:
+        await callback.message.answer("🏆 Siz allaqachon pul yutug'ini topgansiz. Boshqa quti tanlay olmaysiz.")
+    elif not result.accepted:
         await callback.message.answer(f"⏳ Siz hali quti tanlay olmaysiz.\nKeyingi imkoniyat: {format_time(result.next_allowed_at)}\nQolgan vaqt: {remaining_text(result.next_allowed_at)}")
     elif result.attempt.is_winner:
         await callback.message.answer(f"🎉 TABRIKLAYMIZ!\n\nSiz **{box_number}-qutini** tanladingiz!\n\n💰 Yutug'ingiz:\n**{format_money(result.attempt.gift_amount)}**\n\n🍀 Omad sizga kulib boqdi!", parse_mode="Markdown")

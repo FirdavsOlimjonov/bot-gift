@@ -13,6 +13,7 @@ class SelectionResult:
     accepted: bool
     attempt: GameAttempt | None = None
     next_allowed_at: datetime | None = None
+    finished: bool = False
 
 
 class GameService:
@@ -32,6 +33,8 @@ class GameService:
             )
             if user is None or user.is_blocked:
                 raise PermissionError("User is missing or blocked")
+            if user.has_won:
+                return SelectionResult(False, finished=True)
 
             now = self.clock()
             last_attempt = await session.scalar(
@@ -55,6 +58,8 @@ class GameService:
                 raise ValueError("Box is no longer available")
             box.is_available = False
             box.selected_by_name = user.first_name or user.username or "Noma'lum"
+            if box.is_winner:
+                user.has_won = True
             attempt = GameAttempt(
                 user_id=user.id,
                 box_number=box.box_number,

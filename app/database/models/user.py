@@ -21,5 +21,6 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    has_won: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     attempts: Mapped[list["GameAttempt"]] = relationship(back_populates="user")

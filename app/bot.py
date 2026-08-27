@@ -7,8 +7,7 @@ from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 
 from app.config import get_settings
-from app.database.database import create_database
-from app.database.models.base import Base
+from app.database.database import create_database, reset_database
 from app.handlers import admin, game, rules, start, stats
 from app.services.game_service import GameService, initialize_boxes
 
@@ -19,8 +18,7 @@ async def main() -> None:
     load_dotenv()
     settings = get_settings()
     engine, session_factory = create_database(settings)
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+    await reset_database(engine)
     async with session_factory() as session:
         await initialize_boxes(session, settings)
 

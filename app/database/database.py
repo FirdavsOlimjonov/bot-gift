@@ -14,3 +14,11 @@ def create_database(settings: Settings) -> tuple[AsyncEngine, async_sessionmaker
 async def get_session(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
     async with session_factory() as session:
         yield session
+
+
+async def reset_database(engine: AsyncEngine) -> None:
+    from app.database.models.base import Base
+
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.drop_all)
+        await connection.run_sync(Base.metadata.create_all)
