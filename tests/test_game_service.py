@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-import os
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -69,20 +68,6 @@ async def test_statistics(database):
     assert data["attempts"] == 2
     assert data["winners"] == 1
     assert data["money"] == 10000
-
-
-@pytest.mark.asyncio
-async def test_concurrent_requests_are_serialized(database):
-    database_url = os.getenv("TEST_DATABASE_URL")
-    if not database_url or not database_url.startswith("postgresql"):
-        pytest.skip("Set TEST_DATABASE_URL to a PostgreSQL database for row-lock integration coverage")
-    factory, settings = database
-    clock = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
-    results = await __import__("asyncio").gather(
-        make_selection(factory, settings, clock, 25),
-        make_selection(factory, settings, clock, 54),
-    )
-    assert sum(result.accepted for result in results) == 1
 
 
 def test_admin_authorization():

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
@@ -25,6 +25,8 @@ class GameService:
             raise ValueError("Box number must be between 1 and 100")
 
         async with session.begin():
+            if session.bind and session.bind.dialect.name == "sqlite":
+                await session.execute(text("BEGIN IMMEDIATE"))
             user = await session.scalar(
                 select(User).where(User.telegram_id == telegram_id).with_for_update()
             )

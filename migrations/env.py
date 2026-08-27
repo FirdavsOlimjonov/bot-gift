@@ -1,16 +1,20 @@
 from logging.config import fileConfig
+import os
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-from app.config import get_settings
 from app.database.models.base import Base
 import app.database.models  # noqa: F401
 
+load_dotenv()
 config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+database_url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+database_url = database_url.replace("+aiosqlite", "").replace("%", "%%")
+config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
 
 

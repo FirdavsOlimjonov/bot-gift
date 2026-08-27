@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
-    database_url: str = Field(alias="DATABASE_URL")
+    database_url: str = Field(default="sqlite+aiosqlite:///./box_game.db", alias="DATABASE_URL")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
     cooldown_seconds: int = Field(default=120, alias="COOLDOWN_SECONDS")
     winning_boxes: str = Field(default="", alias="WINNING_BOXES")

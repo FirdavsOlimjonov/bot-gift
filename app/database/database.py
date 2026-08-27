@@ -6,7 +6,8 @@ from app.config import Settings
 
 
 def create_database(settings: Settings) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    connect_args = {"timeout": 30} if settings.database_url.startswith("sqlite") else {}
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True, connect_args=connect_args)
     return engine, async_sessionmaker(engine, expire_on_commit=False)
 
 
