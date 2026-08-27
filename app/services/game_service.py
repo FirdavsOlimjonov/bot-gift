@@ -54,6 +54,7 @@ class GameService:
             if not box.is_available:
                 raise ValueError("Box is no longer available")
             box.is_available = False
+            box.selected_by_name = user.first_name or user.username or "Noma'lum"
             attempt = GameAttempt(
                 user_id=user.id,
                 box_number=box.box_number,

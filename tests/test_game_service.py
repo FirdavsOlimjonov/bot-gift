@@ -65,6 +65,9 @@ async def test_claimed_box_is_unavailable_to_other_users(database):
         first = await service.select_box(session, 1, 25)
     assert first.accepted
     async with factory() as session:
+        box = await session.scalar(__import__("sqlalchemy").select(Box).where(Box.box_number == 25))
+        assert box.selected_by_name == "Test"
+    async with factory() as session:
         with pytest.raises(ValueError, match="no longer available"):
             await service.select_box(session, 2, 25)
 

@@ -16,8 +16,10 @@ async def open_boxes(message: Message, session_factory) -> None:
     from app.database.models import Box
 
     async with session_factory() as session:
-        available = (await session.scalars(select(Box.box_number).where(Box.is_available.is_(True)).order_by(Box.box_number))).all()
-    await message.answer("🎁 100 TA QUTI", reply_markup=boxes_keyboard(list(available)))
+        boxes = (await session.scalars(select(Box).order_by(Box.box_number))).all()
+    available = [box.box_number for box in boxes if box.is_available]
+    claimed_names = [box.selected_by_name for box in boxes]
+    await message.answer("🎁 100 TA QUTI", reply_markup=boxes_keyboard(available, claimed_names))
 
 
 @router.message(F.text == "⏳ Keyingi urinish")
@@ -34,8 +36,10 @@ async def next_attempt(message: Message, session_factory, game_service: GameServ
     last_created_at = as_utc(last.created_at) if last and last.created_at else None
     if not last_created_at or last_created_at + timedelta(seconds=game_service.settings.cooldown_seconds) <= game_service.clock():
         async with session_factory() as session:
-            available = (await session.scalars(select(Box.box_number).where(Box.is_available.is_(True)).order_by(Box.box_number))).all()
-        await message.answer("✅ Hozir quti tanlashingiz mumkin!", reply_markup=boxes_keyboard(list(available)))
+            boxes = (await session.scalars(select(Box).order_by(Box.box_number))).all()
+        available = [box.box_number for box in boxes if box.is_available]
+        claimed_names = [box.selected_by_name for box in boxes]
+        await message.answer("✅ Hozir quti tanlashingiz mumkin!", reply_markup=boxes_keyboard(available, claimed_names))
     else:
         next_allowed = last_created_at + timedelta(seconds=game_service.settings.cooldown_seconds)
         await message.answer(f"⏳ Keyingi imkoniyat: {format_time(next_allowed)}\nQolgan vaqt: {remaining_text(next_allowed)}")
@@ -44,6 +48,8 @@ async def next_attempt(message: Message, session_factory, game_service: GameServ
 @router.callback_query(F.data.startswith("box:"))
 async def choose_box(callback: CallbackQuery, session_factory, game_service: GameService) -> None:
     await callback.answer()
+    if callback.data == "box:unavailable":
+        return
     try:
         box_number = int(callback.data.split(":", 1)[1])
         async with session_factory() as session:
@@ -62,3 +68,8 @@ async def choose_box(callback: CallbackQuery, session_factory, game_service: Gam
         await callback.message.answer(f"🎉 TABRIKLAYMIZ!\n\nSiz **{box_number}-qutini** tanladingiz!\n\n💰 Yutug'ingiz:\n**{format_money(result.attempt.gift_amount)}**\n\n🍀 Omad sizga kulib boqdi!", parse_mode="Markdown")
     else:
         await callback.message.answer(f"📦 Siz **{box_number}-qutini** tanladingiz.\n\nAfsuski, bu safar pul yutug'i chiqmadi 😔\n\n🍀 Keyingi imkoniyatni 2 daqiqadan keyin sinab ko'ring!", parse_mode="Markdown")
+
+
+@router.callback_query(F.data == "box:unavailable")
+async def unavailable_box(callback: CallbackQuery) -> None:
+    await callback.answer("Bu quti allaqachon tanlangan.")
