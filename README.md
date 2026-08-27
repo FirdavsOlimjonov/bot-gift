@@ -10,7 +10,7 @@ Async Telegram bot built with Python 3.12, aiogram 3, SQLAlchemy 2 async, local 
 4. Apply the migration: `py -3.12 -m alembic upgrade head`.
 5. Start the bot: `py -3.12 -m app.bot`.
 
-On startup the bot also reconciles the 100 box rows with `WINNING_BOXES`. Each user's selection runs in an SQLite `BEGIN IMMEDIATE` transaction; the cooldown check and attempt insert occur together, preventing concurrent duplicate selections. The same box can be selected by different users.
+On startup the bot also reconciles the 100 box rows with `WINNING_BOXES`. Each user's selection runs in an SQLite `BEGIN IMMEDIATE` transaction; the cooldown check, box claim, and attempt insert occur together. Once claimed, a box is removed from the selection keyboard for everyone and remains unavailable after a restart.
 
 ## Admin commands
 

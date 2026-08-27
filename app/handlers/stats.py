@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.database.models import User
 from app.services.statistics_service import user_statistics
-from app.utils import format_money, format_time, remaining_text
+from app.utils import as_utc, format_money, format_time, remaining_text
 
 router = Router()
 
@@ -17,7 +17,7 @@ async def send_stats(message: Message, session_factory, game_service) -> None:
     next_allowed = None
     if data["last_attempt"]:
         from datetime import timedelta
-        next_allowed = data["last_attempt"] + timedelta(seconds=game_service.settings.cooldown_seconds)
+        next_allowed = as_utc(data["last_attempt"]) + timedelta(seconds=game_service.settings.cooldown_seconds)
     next_text = "Hozir" if not next_allowed or next_allowed <= game_service.clock() else remaining_text(next_allowed)
     await message.answer(f"🏆 SIZNING STATISTIKANGIZ\n\n🎯 Jami urinishlar: {data['attempts']}\n🎁 Tanlangan qutilar: {data['attempts']}\n💰 Yutuqlar soni: {data['winners']}\n💵 Jami yutuq: {format_money(data['money'])}\n\n⏳ Keyingi urinish:\n{next_text}")
 

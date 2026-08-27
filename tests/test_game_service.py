@@ -21,6 +21,7 @@ async def database():
     async with factory() as session:
         await initialize_boxes(session, settings)
         session.add(User(telegram_id=1, first_name="Test"))
+        session.add(User(telegram_id=2, first_name="Second"))
         await session.commit()
     yield factory, settings
     await engine.dispose()
@@ -53,6 +54,19 @@ async def test_winning_and_losing_boxes(database):
     clock[0] += timedelta(minutes=2)
     winning = await make_selection(factory, settings, clock, 25)
     assert winning.attempt.gift_amount == 10000 and winning.attempt.is_winner
+
+
+@pytest.mark.asyncio
+async def test_claimed_box_is_unavailable_to_other_users(database):
+    factory, settings = database
+    clock = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
+    service = GameService(settings, clock=lambda: clock[0])
+    async with factory() as session:
+        first = await service.select_box(session, 1, 25)
+    assert first.accepted
+    async with factory() as session:
+        with pytest.raises(ValueError, match="no longer available"):
+            await service.select_box(session, 2, 25)
 
 
 @pytest.mark.asyncio

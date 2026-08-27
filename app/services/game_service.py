@@ -46,9 +46,14 @@ class GameService:
                 next_allowed = last_attempt.created_at + timedelta(seconds=self.settings.cooldown_seconds)
                 return SelectionResult(False, next_allowed_at=next_allowed)
 
-            box = await session.scalar(select(Box).where(Box.box_number == box_number))
+            box = await session.scalar(
+                select(Box).where(Box.box_number == box_number).with_for_update()
+            )
             if box is None:
                 raise LookupError("Box configuration is missing")
+            if not box.is_available:
+                raise ValueError("Box is no longer available")
+            box.is_available = False
             attempt = GameAttempt(
                 user_id=user.id,
                 box_number=box.box_number,

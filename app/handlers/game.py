@@ -5,14 +5,19 @@ from aiogram.types import CallbackQuery, Message
 
 from app.keyboards.boxes import boxes_keyboard
 from app.services.game_service import GameService
-from app.utils import format_money, format_time, remaining_text
+from app.utils import as_utc, format_money, format_time, remaining_text
 
 router = Router()
 
 
 @router.message(F.text == "🎁 Qutilarni ochish")
-async def open_boxes(message: Message) -> None:
-    await message.answer("🎁 100 TA QUTI", reply_markup=boxes_keyboard())
+async def open_boxes(message: Message, session_factory) -> None:
+    from sqlalchemy import select
+    from app.database.models import Box
+
+    async with session_factory() as session:
+        available = (await session.scalars(select(Box.box_number).where(Box.is_available.is_(True)).order_by(Box.box_number))).all()
+    await message.answer("🎁 100 TA QUTI", reply_markup=boxes_keyboard(list(available)))
 
 
 @router.message(F.text == "⏳ Keyingi urinish")
@@ -26,10 +31,13 @@ async def next_attempt(message: Message, session_factory, game_service: GameServ
             from sqlalchemy import desc
             from app.database.models import GameAttempt
             last = await session.scalar(select(GameAttempt).where(GameAttempt.user_id == user.id).order_by(desc(GameAttempt.created_at)).limit(1))
-    if not last or last.created_at is None or last.created_at + timedelta(seconds=game_service.settings.cooldown_seconds) <= game_service.clock():
-        await message.answer("✅ Hozir quti tanlashingiz mumkin!", reply_markup=boxes_keyboard())
+    last_created_at = as_utc(last.created_at) if last and last.created_at else None
+    if not last_created_at or last_created_at + timedelta(seconds=game_service.settings.cooldown_seconds) <= game_service.clock():
+        async with session_factory() as session:
+            available = (await session.scalars(select(Box.box_number).where(Box.is_available.is_(True)).order_by(Box.box_number))).all()
+        await message.answer("✅ Hozir quti tanlashingiz mumkin!", reply_markup=boxes_keyboard(list(available)))
     else:
-        next_allowed = last.created_at + timedelta(seconds=game_service.settings.cooldown_seconds)
+        next_allowed = last_created_at + timedelta(seconds=game_service.settings.cooldown_seconds)
         await message.answer(f"⏳ Keyingi imkoniyat: {format_time(next_allowed)}\nQolgan vaqt: {remaining_text(next_allowed)}")
 
 
