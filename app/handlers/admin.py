@@ -17,6 +17,12 @@ def is_admin(message_or_callback, admin_ids: set[int]) -> bool:
     return message_or_callback.from_user.id in admin_ids
 
 
+def format_winner_row(attempt: GameAttempt, user: User) -> str:
+    name = user.first_name or user.username or "Noma'lum"
+    timestamp = attempt.created_at.astimezone().strftime("%d.%m.%Y %H:%M")
+    return f"#{attempt.id} | {name} | Box {attempt.box_number} | {format_money(attempt.gift_amount)} | {timestamp}"
+
+
 @router.message(Command("admin"))
 async def admin(message: Message, settings) -> None:
     if not is_admin(message, settings.admin_id_set):
@@ -96,13 +102,7 @@ async def boxes(callback: CallbackQuery, settings, session_factory) -> None:
     async with session_factory() as session:
         rows = (await session.scalars(select(Box).where(Box.is_winner.is_(True)).order_by(Box.box_number))).all()
     text = "📦 BOX CONFIGURATION\n\n" + ("\n".join(f"Box #{box.box_number} → {format_money(box.gift_amount)}" for box in rows) or "Winning boxes are not configured.")
-    navigation = []
-    if page > 0:
-        navigation.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"admin:winners:{page - 1}"))
-    if len(rows) == 10:
-        navigation.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"admin:winners:{page + 1}"))
-    markup = InlineKeyboardMarkup(inline_keyboard=[navigation]) if navigation else None
-    await callback.message.answer(text, reply_markup=markup)
+    await callback.message.answer(text)
     await callback.answer()
 
 
@@ -125,6 +125,12 @@ async def winners(callback: CallbackQuery, settings, session_factory) -> None:
     page = max(0, int(callback.data.rsplit(":", 1)[1]))
     async with session_factory() as session:
         rows = (await session.execute(select(GameAttempt, User).join(User).where(GameAttempt.is_winner.is_(True)).order_by(desc(GameAttempt.created_at)).offset(page * 10).limit(10))).all()
-    text = "🏆 WINNERS\n\n" + ("\n\n".join(f"👤 @{user.username or '-'}\n🆔 Telegram ID: {user.telegram_id}\n📦 Box: #{attempt.box_number}\n💰 Gift: {format_money(attempt.gift_amount)}\n🕐 {attempt.created_at.astimezone().strftime('%d.%m.%Y %H:%M')}" for attempt, user in rows) or "No winners.")
-    await callback.message.answer(text)
+    text = "🏆 WINNERS\n\n" + ("\n".join(format_winner_row(attempt, user) for attempt, user in rows) or "No winners.")
+    navigation = []
+    if page > 0:
+        navigation.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"admin:winners:{page - 1}"))
+    if len(rows) == 10:
+        navigation.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"admin:winners:{page + 1}"))
+    markup = InlineKeyboardMarkup(inline_keyboard=[navigation]) if navigation else None
+    await callback.message.answer(text, reply_markup=markup)
     await callback.answer()
