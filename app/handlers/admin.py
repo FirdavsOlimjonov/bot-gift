@@ -42,10 +42,10 @@ async def set_box(message: Message, settings, session_factory) -> None:
         return
     try:
         number, amount = int(parts[1]), int(parts[2])
-        if not 1 <= number <= 100 or amount < 0:
+        if not 1 <= number <= settings.box_count or amount < 0:
             raise ValueError
     except ValueError:
-        await message.answer("Quti 1-100 oralig'ida, summa esa musbat bo'lishi kerak.")
+        await message.answer(f"Quti 1-{settings.box_count} oralig'ida, summa esa musbat bo'lishi kerak.")
         return
     async with session_factory() as session:
         async with session.begin():

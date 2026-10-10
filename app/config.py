@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
     database_url: str = Field(default="sqlite+aiosqlite:///./box_game.db", alias="DATABASE_URL")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
-    cooldown_seconds: int = Field(default=120, alias="COOLDOWN_SECONDS")
+    box_count: int = Field(default=200, alias="BOX_COUNT", ge=1)
+    cooldown_seconds: int = Field(default=300, alias="COOLDOWN_SECONDS")
     winning_boxes: str = Field(default="", alias="WINNING_BOXES")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -26,10 +27,17 @@ class Settings(BaseSettings):
             box_number, amount = item.split(":", 1)
             number = int(box_number)
             gift = int(amount)
-            if not 1 <= number <= 100 or gift < 0:
+            if not 1 <= number <= self.box_count or gift < 0:
                 raise ValueError("WINNING_BOXES contains an invalid value")
             result[number] = gift
         return result
+
+    @property
+    def cooldown_text(self) -> str:
+        minutes, seconds = divmod(self.cooldown_seconds, 60)
+        if minutes and seconds:
+            return f"{minutes} daqiqa {seconds} soniya"
+        return f"{minutes} daqiqa" if minutes else f"{seconds} soniya"
 
 
 @lru_cache

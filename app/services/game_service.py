@@ -22,8 +22,8 @@ class GameService:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     async def select_box(self, session: AsyncSession, telegram_id: int, box_number: int) -> SelectionResult:
-        if not 1 <= box_number <= 100:
-            raise ValueError("Box number must be between 1 and 100")
+        if not 1 <= box_number <= self.settings.box_count:
+            raise ValueError(f"Box number must be between 1 and {self.settings.box_count}")
 
         async with session.begin():
             if session.bind and session.bind.dialect.name == "sqlite":
@@ -76,7 +76,7 @@ async def initialize_boxes(session: AsyncSession, settings: Settings) -> None:
     configured = settings.configured_winning_boxes
     async with session.begin():
         existing = {box.box_number: box for box in (await session.scalars(select(Box))).all()}
-        for number in range(1, 101):
+        for number in range(1, settings.box_count + 1):
             amount = configured.get(number, 0)
             box = existing.get(number)
             if box is None:

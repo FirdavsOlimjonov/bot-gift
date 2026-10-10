@@ -10,7 +10,7 @@ class Box(Base):
     __tablename__ = "boxes"
     __table_args__ = (
         UniqueConstraint("box_number"),
-        CheckConstraint("box_number BETWEEN 1 AND 100"),
+        CheckConstraint("box_number >= 1"),
         CheckConstraint("gift_amount >= 0"),
     )
 
