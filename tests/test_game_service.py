@@ -134,3 +134,21 @@ def test_boxes_keyboard_pages_stay_under_telegram_limit():
         assert len(buttons) <= 100
         numbered = [b.callback_data for b in buttons if b.callback_data.startswith("box:")]
         assert numbered[0] == f"box:{page * 50 + 1}" and numbered[-1] == f"box:{page * 50 + 50}"
+
+
+@pytest.mark.asyncio
+async def test_winner_is_blocked_and_detected(database):
+    from app.services.game_service import winning_amount, won_text
+
+    factory, settings = database
+    clock = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
+    async with factory() as session:
+        assert await winning_amount(session, 1) is None
+    await make_selection(factory, settings, clock, 25)
+    async with factory() as session:
+        assert await winning_amount(session, 1) == 10000
+        assert await winning_amount(session, 2) is None
+    clock[0] += timedelta(hours=1)  # even long after the cooldown
+    result = await make_selection(factory, settings, clock, 3)
+    assert result.finished and not result.accepted
+    assert "allaqachon yutgansiz" in won_text(10000)

@@ -18,7 +18,12 @@ async def send_stats(message: Message, session_factory, game_service) -> None:
     if data["last_attempt"]:
         from datetime import timedelta
         next_allowed = as_utc(data["last_attempt"]) + timedelta(seconds=game_service.settings.cooldown_seconds)
-    next_text = "Hozir" if not next_allowed or next_allowed <= game_service.clock() else remaining_text(next_allowed)
+    if data["winners"]:
+        next_text = "Yo'q — siz allaqachon yutgansiz 🏆"
+    elif not next_allowed or next_allowed <= game_service.clock():
+        next_text = "Hozir"
+    else:
+        next_text = remaining_text(next_allowed)
     await message.answer(f"🏆 SIZNING STATISTIKANGIZ\n\n🎯 Jami urinishlar: {data['attempts']}\n🎁 Tanlangan qutilar: {data['attempts']}\n💰 Yutuqlar soni: {data['winners']}\n💵 Jami yutuq: {format_money(data['money'])}\n\n⏳ Keyingi urinish:\n{next_text}")
 
 

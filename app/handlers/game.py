@@ -7,7 +7,7 @@ from sqlalchemy import desc, select
 
 from app.database.models import Box, GameAttempt, User
 from app.keyboards.boxes import boxes_keyboard, page_count
-from app.services.game_service import GameService
+from app.services.game_service import GameService, winning_amount, won_text
 from app.utils import as_utc, format_money, format_time, remaining_text
 
 router = Router()
@@ -30,6 +30,11 @@ def boxes_title(settings) -> str:
 
 @router.message(F.text == "🎁 Qutilarni ochish")
 async def open_boxes(message: Message, session_factory, settings) -> None:
+    async with session_factory() as session:
+        amount = await winning_amount(session, message.from_user.id)
+    if amount is not None:
+        await message.answer(won_text(amount))
+        return
     markup = await build_boxes_keyboard(session_factory, settings)
     await message.answer(boxes_title(settings), reply_markup=markup)
 
@@ -53,6 +58,10 @@ async def change_page(callback: CallbackQuery, session_factory, settings) -> Non
 @router.message(F.text == "⏳ Keyingi urinish")
 async def next_attempt(message: Message, session_factory, settings, game_service: GameService) -> None:
     async with session_factory() as session:
+        amount = await winning_amount(session, message.from_user.id)
+        if amount is not None:
+            await message.answer(won_text(amount))
+            return
         user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
         last = None
         if user:
@@ -90,7 +99,9 @@ async def choose_box(callback: CallbackQuery, session_factory, settings, game_se
         return
     await callback.message.edit_reply_markup(reply_markup=None)
     if result.finished:
-        await callback.message.answer("🏆 Siz allaqachon pul yutug'ini topgansiz. Boshqa quti tanlay olmaysiz.")
+        async with session_factory() as session:
+            amount = await winning_amount(session, callback.from_user.id)
+        await callback.message.answer(won_text(amount))
     elif not result.accepted:
         await callback.message.answer(
             f"⏳ Siz hali quti tanlay olmaysiz.\nKeyingi imkoniyat: {format_time(result.next_allowed_at)}\n"
@@ -99,7 +110,8 @@ async def choose_box(callback: CallbackQuery, session_factory, settings, game_se
     elif result.attempt.is_winner:
         await callback.message.answer(
             f"🎉 TABRIKLAYMIZ!\n\nSiz <b>{box_number}-qutini</b> tanladingiz!\n\n"
-            f"💰 Yutug'ingiz:\n<b>{format_money(result.attempt.gift_amount)}</b>\n\n🍀 Omad sizga kulib boqdi!"
+            f"💰 Yutug'ingiz:\n<b>{format_money(result.attempt.gift_amount)}</b>\n\n🍀 Omad sizga kulib boqdi!\n\n"
+            "Siz o'yinni yakunladingiz, boshqa quti tanlay olmaysiz."
         )
     else:
         await callback.message.answer(

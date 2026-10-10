@@ -72,6 +72,27 @@ class GameService:
             return SelectionResult(True, attempt=attempt)
 
 
+def won_text(amount: int | None) -> str:
+    from app.utils import format_money
+
+    prize = f"\n💰 Yutug'ingiz: <b>{format_money(amount)}</b>\n" if amount else "\n"
+    return f"🏆 Bo'ldi, siz allaqachon yutgansiz!{prize}\nBoshqa quti tanlay olmaysiz."
+
+
+async def winning_amount(session: AsyncSession, telegram_id: int) -> int | None:
+    """Return the prize amount if this user has already won, otherwise None."""
+    user = await session.scalar(select(User).where(User.telegram_id == telegram_id))
+    if user is None or not user.has_won:
+        return None
+    attempt = await session.scalar(
+        select(GameAttempt)
+        .where(GameAttempt.user_id == user.id, GameAttempt.is_winner.is_(True))
+        .order_by(desc(GameAttempt.created_at))
+        .limit(1)
+    )
+    return attempt.gift_amount if attempt else 0
+
+
 async def initialize_boxes(session: AsyncSession, settings: Settings) -> None:
     configured = settings.configured_winning_boxes
     async with session.begin():

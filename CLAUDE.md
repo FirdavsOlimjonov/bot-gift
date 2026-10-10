@@ -48,6 +48,7 @@ app/
     game_service.py GameService(settings, clock=None).select_box(session, telegram_id, box_number) -> SelectionResult(accepted, attempt, next_allowed_at, finished)
                     initialize_boxes(session, settings): ensures BOX_COUNT rows, applies WINNING_BOXES
                     ensure_user(session, tg_user): upsert user on /start
+                    winning_amount(session, telegram_id) -> prize int if user.has_won else None; won_text(amount) -> "🏆 Bo'ldi, siz allaqachon yutgansiz!..."
     statistics_service.py user_statistics(session, user_id), admin_statistics(session)
   handlers/
     start.py        /start (ensure_user + main menu), /help
@@ -61,6 +62,7 @@ app/
     admin.py        admin_keyboard() inline
 migrations/         alembic, versions 0001_initial → 0002_box_availability → 0003_box_selector_name → 0004_user_has_won
                     env.py strips "+aiosqlite" from URL for sync alembic
+tests/test_game_handler.py  calls choose_box with fake aiogram callback objects (no /start, winner blocked, taken box)
 tests/test_game_service.py  in-memory sqlite; tests cooldown (5 min boundary), 200 boxes, keyboard page limits, win/lose, finished-after-win, box claim exclusivity, stats, is_admin
 ```
 
@@ -72,7 +74,7 @@ One transaction (`session.begin()`, plus `BEGIN IMMEDIATE` on SQLite for write l
 4. Load box; missing → `LookupError`; `not is_available` → `ValueError("Box is no longer available")`.
 5. Mark box unavailable, set `selected_by_name` (first_name / username / "Noma'lum"); if winner → `user.has_won = True`.
 6. Insert GameAttempt with `created_at=now` (clock injectable for tests).
-Handler `choose_box` maps ValueError/LookupError/PermissionError → "⚠️ Bu so'rovni bajarib bo'lmadi."
+Handler `choose_box` first calls `ensure_user(callback.from_user)` (users are wiped on restart; without this, clicking a box before /start raised PermissionError → "Bu so'rovni bajarib bo'lmadi" — bug fixed 2026-10-10). Errors: taken box → "❌ Bu quti allaqachon tanlangan" + refreshed keyboard; blocked → "⛔"; anything else logged via `logger.exception`.
 
 ## Important behaviors / gotchas
 - **DB is wiped on every startup** (`reset_database` = drop_all + create_all). Each restart = fresh game. Alembic migrations are therefore not what builds the schema at runtime; keep models and migrations in sync anyway.
@@ -80,6 +82,7 @@ Handler `choose_box` maps ValueError/LookupError/PermissionError → "⚠️ Bu 
 - `Base` lives in `models/user.py` (unusual); import via `app.database.models.base`.
 - Handlers get dependencies by parameter name injection from dispatcher: `settings`, `session_factory`, `game_service`.
 - Admin check = `is_admin(obj, settings.admin_id_set)` on every admin handler/callback.
+- **Winners are done for the game**: after a win, "🎁 Qutilarni ochish", "⏳ Keyingi urinish" and box callbacks all reply with `won_text(...)` (no keyboard, no countdown); stats shows "Keyingi urinish: Yo'q — siz allaqachon yutgansiz". Enforced in `select_box` (`has_won`) + handler checks via `winning_amount`.
 
 ## Known issues
 Fixed 2026-10-10: `next_attempt` NameError (Box import), cooldown text mismatch (now from settings everywhere), Markdown `**` → HTML `<b>`, rules text claiming results are hidden.
@@ -90,11 +93,14 @@ Still open:
 4. `requirements.txt` pins `pytest<9` but pytest 9 was used locally.
 5. Tests' `Settings(...)` also reads the real `.env`; always pass explicit values in tests.
 
-## Current prize setup (.env, 2026-10-10)
-BOX_COUNT=200, COOLDOWN_SECONDS=300, 20 prizes: original 10 in 1–100 (7,18,25,34,47,56,63,73,88,96) + 10 in 101–200 (104,119,127,138,145,152,166,171,184,199) reusing the same amounts (1 000–35 000 so'm).
+## Current prize setup (.env, set by user 2026-10-10)
+BOX_COUNT=200, COOLDOWN_SECONDS=300, 20 prizes, total exactly 300 000 so'm (box 7 = 500 is fixed by user, don't change it):
+`7:500,13:14000,14:24000,21:16000,37:15000,53:13000,61:17500,72:17500,89:11000,95:21000,103:14000,119:11000,127:17500,138:1000,145:21000,152:13000,166:16000,171:24500,184:15000,199:17500`
+.env can't be written via remote tools — user edits it by hand.
 
 ## Conventions
 - Money formatted via `format_money`; times via `format_time` / `remaining_text`.
 - User-facing strings in Uzbek; keep emoji prefixes since reply-keyboard handlers match exact text (change keyboard + handler together).
 - Keep business logic in `services/`, handlers thin; make new logic testable with injectable clock and in-memory SQLite like existing tests.
 - Don't commit `.env` or `box_game.db` (gitignored).
+- Before committing to D:\bot-gift, stage + diff the device copy first: the user's IDE (PyCharm) once silently reverted game.py to an older version.
